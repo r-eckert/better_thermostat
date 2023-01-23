@@ -328,6 +328,9 @@ def convert_outbound_states(self, entity_id, hvac_mode) -> Union[dict, None]:
                     )
                 else:
                     _new_heating_setpoint = calculate_setpoint_override(self, entity_id)
+                    
+            elif _calibration_type == 2:
+                _new_heating_setpoint = self.bt_target_temp
 
             _system_modes = self.real_trvs[entity_id]["hvac_modes"]
             _has_system_mode = False

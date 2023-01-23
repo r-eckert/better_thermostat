@@ -3,7 +3,7 @@ import logging
 
 from homeassistant.components.number.const import SERVICE_SET_VALUE
 
-from ..utils.helpers import find_local_calibration_entity, find_valve_entity
+from ..utils.helpers import find_local_calibration_entity, find_valve_entity, find_temp_override_entity
 from .generic import (
     set_hvac_mode as generic_set_hvac_mode,
     set_temperature as generic_set_temperature,
@@ -17,13 +17,18 @@ async def get_info(self, entity_id):
     """Get info from TRV."""
     support_offset = False
     support_valve = False
+    support_sensor_temp_override = False
     offset = await find_local_calibration_entity(self, entity_id)
     if offset is not None:
         support_offset = True
     valve = await find_valve_entity(self, entity_id)
     if valve is not None:
         support_valve = True
-    return {"support_offset": support_offset, "support_valve": support_valve}
+    temp_override_entity = await find_temp_override_entity(self, entity_id)
+    if temp_override_entity is not None:
+        support_sensor_temp_override = True
+
+    return {"support_offset": support_offset, "support_valve": support_valve, "support_sensor_temp_override": support_sensor_temp_override}
 
 
 async def init(self, entity_id):
@@ -49,6 +54,34 @@ async def init(self, entity_id):
                     "better_thermostat %s: waiting for TRV/climate entity with id '%s' to become fully available...",
                     self.name,
                     self.real_trvs[entity_id]["local_temperature_calibration_entity"],
+                )
+                await asyncio.sleep(5)
+                continue
+            _ready = False
+            return
+
+    if (
+        self.real_trvs[entity_id]["local_temperature_override_entity"] is None
+        and self.real_trvs[entity_id]["calibration"] == 2
+    ):
+        self.real_trvs[entity_id][
+            "local_temperature_override_entity"
+        ] = await find_temp_override_entity(self, entity_id)
+        _LOGGER.debug(
+            "better_thermostat %s: uses local temperature override entity %s",
+            self.name,
+            self.real_trvs[entity_id]["local_temperature_override_entity"],
+        )
+        # Wait for the entity to be available
+        _ready = True
+        while _ready:
+            if self.hass.states.get(
+                self.real_trvs[entity_id]["local_temperature_override_entity"]
+            ).state in (STATE_UNAVAILABLE, STATE_UNKNOWN, None):
+                _LOGGER.info(
+                    "better_thermostat %s: waiting for TRV/climate entity with id '%s' to become fully available...",
+                    self.name,
+                    self.real_trvs[entity_id]["local_temperature_override_entity"],
                 )
                 await asyncio.sleep(5)
                 continue
@@ -170,4 +203,21 @@ async def set_valve(self, entity_id, valve):
         },
         blocking=True,
         context=self.context,
+    )
+
+
+async def set_external_sensor_temperature(self, entity_id, temperature):
+    """Set new external sensor temperature."""
+    await self.hass.services.async_call(
+        "number",
+        SERVICE_SET_VALUE,
+        {
+            "entity_id": self.real_trvs[entity_id][
+                "local_temperature_override_entity"
+            ],
+            "value": temperature,
+        },
+        blocking=True,
+        limit=None,
+        context=self._context,
     )

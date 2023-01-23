@@ -39,13 +39,24 @@ from . import DOMAIN  # pylint:disable=unused-import
 
 _LOGGER = logging.getLogger(__name__)
 
+CALIBRATION_OPTION_TARGET_TEMP_BASED = selector.SelectOptionDict(
+    value=CalibrationType.TARGET_TEMP_BASED,
+    label="Target Temperature Based",
+)
+
+CALIBRATION_OPTION_OFFSET_BASED = selector.SelectOptionDict(
+    value=CalibrationType.LOCAL_BASED, label="Offset Based"
+)
+
+CALIBRATION_OPTION_TEMPERATURE_OVERRIDE_BASED = selector.SelectOptionDict(
+    value=CalibrationType.TEMPERATURE_OVERRIDE_BASED,
+    label="Temperature Override Based",
+)
+
 CALIBRATION_TYPE_SELECTOR = selector.SelectSelector(
     selector.SelectSelectorConfig(
         options=[
-            selector.SelectOptionDict(
-                value=CalibrationType.TARGET_TEMP_BASED,
-                label="Target Temperature Based",
-            )
+            CALIBRATION_OPTION_TARGET_TEMP_BASED
         ],
         mode=selector.SelectSelectorMode.DROPDOWN,
     )
@@ -54,13 +65,8 @@ CALIBRATION_TYPE_SELECTOR = selector.SelectSelector(
 CALIBRATION_TYPE_ALL_SELECTOR = selector.SelectSelector(
     selector.SelectSelectorConfig(
         options=[
-            selector.SelectOptionDict(
-                value=CalibrationType.TARGET_TEMP_BASED,
-                label="Target Temperature Based",
-            ),
-            selector.SelectOptionDict(
-                value=CalibrationType.LOCAL_BASED, label="Offset Based"
-            ),
+            CALIBRATION_OPTION_TARGET_TEMP_BASED,
+            CALIBRATION_OPTION_OFFSET_BASED,
         ],
         mode=selector.SelectSelectorMode.DROPDOWN,
     )
@@ -150,29 +156,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             homematic = True
 
         fields = OrderedDict()
+        calibration_options = [CALIBRATION_OPTION_TARGET_TEMP_BASED]
 
-        _default_calibration = "target_temp_based"
+        _default_calibration = CalibrationType.TARGET_TEMP_BASED
         _adapter = _trv_config.get("adapter", None)
         if _adapter is not None:
             _info = await _adapter.get_info(self, _trv_config.get("trv"))
+            support_sensor_temp_override = _info.get("support_sensor_temp_override", False)
+            support_offset = _info.get("support_offset", False)
 
-            if _info.get("support_offset", False):
-                _default_calibration = "local_calibration_based"
+            if support_sensor_temp_override:
+                _default_calibration = CalibrationType.TEMPERATURE_OVERRIDE_BASED
+                calibration_options.append(CALIBRATION_OPTION_TEMPERATURE_OVERRIDE_BASED)
+            if support_offset:
+                if not support_sensor_temp_override:
+                    _default_calibration = CalibrationType.LOCAL_BASED
+                calibration_options.append(CALIBRATION_OPTION_OFFSET_BASED)
 
-        if _default_calibration == "local_calibration_based":
-            fields[
-                vol.Required(
-                    CONF_CALIBRATION,
-                    default=user_input.get(CONF_CALIBRATION, _default_calibration),
+
+        fields[
+            vol.Required(
+                CONF_CALIBRATION,
+                default=user_input.get(CONF_CALIBRATION, _default_calibration),
+            )
+        ] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=calibration_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
                 )
-            ] = CALIBRATION_TYPE_ALL_SELECTOR
-        else:
-            fields[
-                vol.Required(
-                    CONF_CALIBRATION,
-                    default=user_input.get(CONF_CALIBRATION, _default_calibration),
-                )
-            ] = CALIBRATION_TYPE_SELECTOR
+            )
 
         fields[
             vol.Required(
@@ -380,8 +392,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             homematic = True
 
         fields = OrderedDict()
+        calibration_options = [CALIBRATION_OPTION_TARGET_TEMP_BASED]
 
-        _default_calibration = "target_temp_based"
+        _default_calibration = CalibrationType.TARGET_TEMP_BASED
         self.name = user_input.get(CONF_NAME, "-")
 
         _adapter = load_adapter(
@@ -389,12 +402,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
         if _adapter is not None:
             _info = await _adapter.get_info(self, _trv_config.get("trv"))
+            support_sensor_temp_override = _info.get("support_sensor_temp_override", False)
+            support_offset = _info.get("support_offset", False)
 
-            if _info.get("support_offset", False):
-                _default_calibration = "local_calibration_based"
+            if support_sensor_temp_override:
+                _default_calibration = CalibrationType.TEMPERATURE_OVERRIDE_BASED
+                calibration_options.append(CALIBRATION_OPTION_TEMPERATURE_OVERRIDE_BASED)
+            if support_offset:
+                if not support_sensor_temp_override:
+                    _default_calibration = CalibrationType.LOCAL_BASED
+                calibration_options.append(CALIBRATION_OPTION_OFFSET_BASED)
 
-        if _default_calibration == "local_calibration_based":
-            fields[
+        fields[
                 vol.Required(
                     CONF_CALIBRATION,
                     default=user_input.get(
@@ -404,19 +423,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ),
                 )
-            ] = CALIBRATION_TYPE_ALL_SELECTOR
-        else:
-            fields[
-                vol.Required(
-                    CONF_CALIBRATION,
-                    default=user_input.get(
-                        CONF_CALIBRATION,
-                        _trv_config["advanced"].get(
-                            CONF_CALIBRATION, _default_calibration
-                        ),
-                    ),
-                )
-            ] = CALIBRATION_TYPE_SELECTOR
+        ] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=calibration_options,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        )
 
         fields[
             vol.Required(

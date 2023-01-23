@@ -85,6 +85,7 @@ class CalibrationType(StrEnum):
 
     TARGET_TEMP_BASED = "target_temp_based"
     LOCAL_BASED = "local_calibration_based"
+    TEMPERATURE_OVERRIDE_BASED = "temperature_override_based"
 
 
 class CalibrationMode(StrEnum):

@@ -518,6 +518,42 @@ async def find_local_calibration_entity(self, entity_id):
     return None
 
 
+async def find_temp_override_entity(self, entity_id):
+    """Find the external temperature entity for the TRV.
+
+    Parameters
+    ----------
+    self :
+            self instance of better_thermostat
+
+    Returns
+    -------
+    str
+            the entity_id of the external temperature entity
+    None
+            if no external temperature entity was found
+    """
+    entity_registry = er.async_get(self.hass)
+    reg_entity = entity_registry.async_get(entity_id)
+    entity_entries = async_entries_for_config_entry(
+        entity_registry, reg_entity.config_entry_id
+    )
+    for entity in entity_entries:
+        uid = entity.unique_id
+        # Make sure we use the correct device entities
+        if entity.device_id == reg_entity.device_id:
+            if "remote_temperature" in uid:
+                _LOGGER.debug(
+                    f"better thermostat: Found external temperature entity {entity.entity_id} for {entity_id}"
+                )
+                return entity.entity_id
+
+    _LOGGER.debug(
+        f"better thermostat: Could not find external temperature entity for {entity_id}"
+    )
+    return None
+
+
 async def get_trv_intigration(self, entity_id):
     """Get the integration of the TRV.
 

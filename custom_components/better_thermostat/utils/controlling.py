@@ -12,6 +12,7 @@ from .bridge import (
     get_offset_steps,
     set_temperature,
     set_hvac_mode,
+    set_external_sensor_temperature
 )
 from ..events.trv import convert_outbound_states
 from homeassistant.components.climate.const import HVACMode
@@ -177,6 +178,13 @@ async def control_trv(self, heater_entity_id=None):
                 )
                 await set_offset(self, heater_entity_id, _calibration)
                 self.real_trvs[heater_entity_id]["calibration_received"] = False
+
+        # set new external sensor temperature
+        if self.real_trvs[heater_entity_id]["calibration"] == 2:
+            if self.cur_temp is not None and _new_hvac_mode != HVACMode.OFF:
+                if self.cur_temp != self.old_external_temp:
+                    self.old_external_temp = self.cur_temp
+                    await set_external_sensor_temperature(self, heater_entity_id, self.cur_temp)
 
         # set new target temperature
         if (

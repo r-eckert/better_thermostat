@@ -71,6 +71,7 @@ from .const import (
     SERVICE_RESET_HEATING_POWER,
     BETTERTHERMOSTAT_SET_TEMPERATURE_SCHEMA,
     BetterThermostatEntityFeature,
+    CalibrationType,
 )
 
 from .utils.controlling import control_queue, control_trv
@@ -282,8 +283,10 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
 
         for trv in self.all_trvs:
             _calibration = 1
-            if trv["advanced"]["calibration"] == "local_calibration_based":
+            if trv["advanced"]["calibration"] == CalibrationType.LOCAL_BASED:
                 _calibration = 0
+            elif trv["advanced"]["calibration"] == CalibrationType.TEMPERATURE_OVERRIDE_BASED:
+                _calibration = 2
             _adapter = load_adapter(self, trv["integration"], trv["trv"])
             _model_quirks = load_model_quirks(self, trv["model"], trv["trv"])
             self.real_trvs[trv["trv"]] = {
@@ -303,6 +306,7 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
                 "hvac_modes": None,
                 "hvac_mode": None,
                 "local_temperature_calibration_entity": None,
+                "local_temperature_override_entity": None,
                 "local_calibration_min": None,
                 "local_calibration_max": None,
                 "calibration_received": True,

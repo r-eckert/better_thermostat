@@ -96,3 +96,10 @@ async def set_offset(self, entity_id, offset):
 async def set_valve(self, entity_id, valve):
     """Set new target valve."""
     return await self.real_trvs[entity_id]["adapter"].set_valve(self, entity_id, valve)
+
+
+async def set_external_sensor_temperature(self, entity_id, temperature):
+    """Set new external sensor temperature."""
+    return await self.real_trvs[entity_id]["adapter"].set_external_sensor_temperature(
+        self, entity_id, temperature
+    )  

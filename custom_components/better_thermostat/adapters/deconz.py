@@ -11,8 +11,8 @@ async def get_info(self, entity_id):
     """Get info from TRV."""
     _offset = self.hass.states.get(entity_id).attributes.get("offset", None)
     if _offset is None:
-        return {"support_offset": False, "support_valve": False}
-    return {"support_offset": True, "support_valve": False}
+        return {"support_offset": False, "support_valve": False, "support_sensor_temp_override": False}
+    return {"support_offset": True, "support_valve": False, "support_sensor_temp_override": False}
 
 
 async def init(self, entity_id):
@@ -64,3 +64,7 @@ async def set_offset(self, entity_id, offset):
 async def set_valve(self, entity_id, valve):
     """Set new target valve."""
     return None
+
+async def set_external_sensor_temperature(self, entity_id, temperature):
+    """Set new external sensor temperature."""
+    return # Not supported
