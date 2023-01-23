@@ -541,7 +541,7 @@ async def find_temp_override_entity(self, entity_id):
     for entity in entity_entries:
         uid = entity.unique_id
         # Make sure we use the correct device entities
-        if entity.device_id == reg_entity.device_id:
+        if entity.device_id == reg_entity.device_id and entity.domain == "number":
             if "remote_temperature" in uid:
                 _LOGGER.debug(
                     f"better thermostat: Found external temperature entity {entity.entity_id} for {entity_id}"
