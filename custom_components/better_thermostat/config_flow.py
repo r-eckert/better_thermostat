@@ -53,25 +53,6 @@ CALIBRATION_OPTION_TEMPERATURE_OVERRIDE_BASED = selector.SelectOptionDict(
     label="Temperature Override Based",
 )
 
-CALIBRATION_TYPE_SELECTOR = selector.SelectSelector(
-    selector.SelectSelectorConfig(
-        options=[
-            CALIBRATION_OPTION_TARGET_TEMP_BASED
-        ],
-        mode=selector.SelectSelectorMode.DROPDOWN,
-    )
-)
-
-CALIBRATION_TYPE_ALL_SELECTOR = selector.SelectSelector(
-    selector.SelectSelectorConfig(
-        options=[
-            CALIBRATION_OPTION_TARGET_TEMP_BASED,
-            CALIBRATION_OPTION_OFFSET_BASED,
-        ],
-        mode=selector.SelectSelectorMode.DROPDOWN,
-    )
-)
-
 CALIBRATION_MODE_SELECTOR = selector.SelectSelector(
     selector.SelectSelectorConfig(
         options=[

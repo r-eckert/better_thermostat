@@ -272,6 +272,7 @@ def convert_outbound_states(self, entity_id, hvac_mode) -> Union[dict, None]:
 
     _new_local_calibration = None
     _new_heating_setpoint = None
+    _external_sensor_temp = None
 
     try:
         _calibration_type = self.real_trvs[entity_id].get("calibration", 1)
@@ -331,6 +332,7 @@ def convert_outbound_states(self, entity_id, hvac_mode) -> Union[dict, None]:
                     
             elif _calibration_type == 2:
                 _new_heating_setpoint = self.bt_target_temp
+                _external_sensor_temp = self.cur_temp
 
             _system_modes = self.real_trvs[entity_id]["hvac_modes"]
             _has_system_mode = False
@@ -367,6 +369,7 @@ def convert_outbound_states(self, entity_id, hvac_mode) -> Union[dict, None]:
             "local_temperature": self.real_trvs[entity_id]["current_temperature"],
             "system_mode": hvac_mode,
             "local_temperature_calibration": _new_local_calibration,
+            "external_sensor_temperature": _external_sensor_temp,
         }
     except Exception as e:
         _LOGGER.error(e)

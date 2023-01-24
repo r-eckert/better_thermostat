@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta
 
 from custom_components.better_thermostat.utils.model_quirks import (
     override_set_hvac_mode,
@@ -103,6 +104,7 @@ async def control_trv(self, heater_entity_id=None):
 
         _temperature = _remapped_states.get("temperature", None)
         _calibration = _remapped_states.get("local_temperature_calibration", None)
+        _external_sensor_temp = _remapped_states.get("external_sensor_temperature", None)
 
         _new_hvac_mode = handle_window_open(self, _remapped_states)
 
@@ -180,11 +182,11 @@ async def control_trv(self, heater_entity_id=None):
                 self.real_trvs[heater_entity_id]["calibration_received"] = False
 
         # set new external sensor temperature
-        if self.real_trvs[heater_entity_id]["calibration"] == 2:
-            if self.cur_temp is not None and _new_hvac_mode != HVACMode.OFF:
-                if self.cur_temp != self.old_external_temp:
-                    self.old_external_temp = self.cur_temp
-                    await set_external_sensor_temperature(self, heater_entity_id, self.cur_temp)
+        if _external_sensor_temp is not None and _new_hvac_mode != HVACMode.OFF:
+            if _external_sensor_temp != self.old_external_temp or (datetime.now() - self.last_external_temperature_set).total_seconds() / 60 >= 30:
+                self.last_external_temperature_set = datetime.now()
+                self.old_external_temp = _external_sensor_temp
+                await set_external_sensor_temperature(self, heater_entity_id, self.cur_temp)
 
         # set new target temperature
         if (
