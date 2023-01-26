@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from typing import Union
 from custom_components.better_thermostat.const import CONF_HOMATICIP
@@ -374,3 +374,14 @@ def convert_outbound_states(self, entity_id, hvac_mode) -> Union[dict, None]:
     except Exception as e:
         _LOGGER.error(e)
         return None
+
+async def external_temp_refresh_queue(self):
+    while True:
+        next_refresh_time = self.last_external_temperature_set + timedelta(minutes=15)
+        seconds_to_next_refresh = (next_refresh_time - datetime.now()).total_seconds()
+        if seconds_to_next_refresh <= 0:
+            self.force_external_temp_refresh = True
+            self.async_write_ha_state()
+            await self.control_queue_task.put(self)
+        else:
+            await asyncio.sleep(seconds_to_next_refresh)

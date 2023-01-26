@@ -48,6 +48,10 @@ async def get_max_offset(self, entity_id):
     return 10
 
 
+async def get_external_sensor_temperature(self, entity_id):
+    return  # Not supported
+
+
 async def set_offset(self, entity_id, offset):
     """Set new target offset."""
     if offset >= 10:
@@ -68,6 +72,7 @@ async def set_valve(self, entity_id, valve):
     """Set new target valve."""
     return None
 
+
 async def set_external_sensor_temperature(self, entity_id, temperature):
     """Set new external sensor temperature."""
-    return # Not supported
+    return  # Not supported

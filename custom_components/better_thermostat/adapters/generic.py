@@ -32,6 +32,10 @@ async def get_max_offset(self, entity_id):
     return 6
 
 
+async def get_external_sensor_temperature(self, entity_id):
+    return  # Not supported
+
+
 async def set_temperature(self, entity_id, temperature):
     """Set new target temperature."""
     await self.hass.services.async_call(
@@ -63,6 +67,7 @@ async def set_valve(self, entity_id, valve):
     """Set new target valve."""
     return  # Not supported
 
+
 async def set_external_sensor_temperature(self, entity_id, temperature):
     """Set new external sensor temperature."""
-    return # Not supported
+    return  # Not supported

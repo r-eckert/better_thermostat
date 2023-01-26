@@ -72,6 +72,11 @@ async def get_max_offset(self, entity_id):
     return await self.real_trvs[entity_id]["adapter"].get_max_offset(self, entity_id)
 
 
+async def get_external_sensor_temperature(self, entity_id):
+    """Get currently set external sensor temperature."""
+    return await self.real_trvs[entity_id]["adapter"].get_external_sensor_temperature(self, entity_id)
+
+
 async def set_temperature(self, entity_id, temperature):
     """Set new target temperature."""
     return await self.real_trvs[entity_id]["adapter"].set_temperature(
@@ -102,4 +107,4 @@ async def set_external_sensor_temperature(self, entity_id, temperature):
     """Set new external sensor temperature."""
     return await self.real_trvs[entity_id]["adapter"].set_external_sensor_temperature(
         self, entity_id, temperature
-    )  
+    )

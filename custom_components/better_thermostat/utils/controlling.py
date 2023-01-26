@@ -11,6 +11,7 @@ from .bridge import (
     set_offset,
     get_current_offset,
     get_offset_steps,
+    get_external_sensor_temperature,
     set_temperature,
     set_hvac_mode,
     set_external_sensor_temperature
@@ -68,6 +69,7 @@ async def control_queue(self):
 
                 self.control_queue_task.task_done()
                 self.ignore_states = False
+                self.force_external_temp_refresh = False
 
 
 async def control_trv(self, heater_entity_id=None):
@@ -183,9 +185,12 @@ async def control_trv(self, heater_entity_id=None):
 
         # set new external sensor temperature
         if _external_sensor_temp is not None and _new_hvac_mode != HVACMode.OFF:
-            if _external_sensor_temp != self.old_external_temp or (datetime.now() - self.last_external_temperature_set).total_seconds() / 60 >= 30:
+            old_external_sensor_temp = await get_external_sensor_temperature(self, heater_entity_id)
+            if (
+                _external_sensor_temp != old_external_sensor_temp
+                or self.force_external_temp_refresh
+            ):
                 self.last_external_temperature_set = datetime.now()
-                self.old_external_temp = _external_sensor_temp
                 await set_external_sensor_temperature(self, heater_entity_id, self.cur_temp)
 
         # set new target temperature

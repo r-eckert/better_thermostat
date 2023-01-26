@@ -156,6 +156,17 @@ async def get_max_offset(self, entity_id):
     )
 
 
+async def get_external_sensor_temperature(self, entity_id):
+    """Get currently set external sensor temperature."""
+    return float(
+        str(
+            self.hass.states.get(
+                self.real_trvs[entity_id]["local_temperature_override_entity"]
+            ).state
+        )
+    )
+
+
 async def set_offset(self, entity_id, offset):
     """Set new target offset."""
     max_calibration = await get_max_offset(self, entity_id)

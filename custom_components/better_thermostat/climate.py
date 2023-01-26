@@ -76,7 +76,7 @@ from .const import (
 
 from .utils.controlling import control_queue, control_trv
 from .events.temperature import trigger_temperature_change
-from .events.trv import trigger_trv_change
+from .events.trv import trigger_trv_change, external_temp_refresh_queue
 from .events.window import trigger_window_change, window_queue
 
 _LOGGER = logging.getLogger(__name__)
@@ -239,6 +239,7 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
         self.last_external_sensor_change = datetime.now() - timedelta(hours=2)
         self.last_internal_sensor_change = datetime.now() - timedelta(hours=2)
         self.last_external_temperature_set = datetime.now() - timedelta(hours=2)
+        self.force_external_temp_refresh = True
         self._temp_lock = asyncio.Lock()
         self.startup_running = True
         self._saved_temperature = None
@@ -288,6 +289,7 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
                 _calibration = 0
             elif trv["advanced"]["calibration"] == CalibrationType.TEMPERATURE_OVERRIDE_BASED:
                 _calibration = 2
+                asyncio.create_task(external_temp_refresh_queue(self))
             _adapter = load_adapter(self, trv["integration"], trv["trv"])
             _model_quirks = load_model_quirks(self, trv["model"], trv["trv"])
             self.real_trvs[trv["trv"]] = {
