@@ -229,6 +229,5 @@ async def set_external_sensor_temperature(self, entity_id, temperature):
             "value": temperature,
         },
         blocking=True,
-        limit=None,
         context=self._context,
     )
