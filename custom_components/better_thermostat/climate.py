@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from random import randint
 from statistics import mean
 
+from .utils.watcher import check_all_entities
+
 from .utils.weather import check_ambient_air_temperature, check_weather
 from .utils.bridge import (
     get_current_offset,
@@ -20,8 +22,8 @@ from .utils.model_quirks import load_model_quirks
 
 from .utils.helpers import convert_to_float
 from homeassistant.helpers import entity_platform
-from homeassistant.core import callback, CoreState, Context
-
+from homeassistant.core import callback, CoreState, Context, ServiceCall
+import json
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (
     ATTR_MAX_TEMP,
@@ -46,9 +48,10 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from homeassistant.components.group.util import reduce_attribute
 
-from . import DOMAIN
 from .const import (
+    ATTR_STATE_BATTERIES,
     ATTR_STATE_CALL_FOR_HEAT,
+    ATTR_STATE_ERRORS,
     ATTR_STATE_HUMIDIY,
     ATTR_STATE_LAST_CHANGE,
     ATTR_STATE_MAIN_MODE,
@@ -80,12 +83,17 @@ from .events.trv import trigger_trv_change, external_temp_refresh_queue
 from .events.window import trigger_window_change, window_queue
 
 _LOGGER = logging.getLogger(__name__)
+DOMAIN = "better_thermostat"
+
+
+class ContinueLoop(Exception):
+    pass
 
 
 async def async_setup_entry(hass, entry, async_add_devices):
     """Setup sensor platform."""
 
-    async def async_service_handler(self, data):
+    async def async_service_handler(self, data: ServiceCall):
         _LOGGER.debug(f"Service call: {self} » {data.service}")
         if data.service == SERVICE_RESTORE_SAVED_TARGET_TEMPERATURE:
             await self.restore_temp_temperature()
@@ -97,7 +105,7 @@ async def async_setup_entry(hass, entry, async_add_devices):
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
         SERVICE_SET_TEMP_TARGET_TEMPERATURE,
-        BETTERTHERMOSTAT_SET_TEMPERATURE_SCHEMA,
+        BETTERTHERMOSTAT_SET_TEMPERATURE_SCHEMA,  # type: ignore
         async_service_handler,
         [
             BetterThermostatEntityFeature.TARGET_TEMPERATURE,
@@ -258,6 +266,9 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
         self._async_unsub_state_changed = None
         self.old_external_temp = 0
         self.old_internal_temp = 0
+        self.all_entities = []
+        self.devices_states = {}
+        self.devices_errors = []
         self.control_queue_task = asyncio.Queue(maxsize=1)
         if self.window_id is not None:
             self.window_queue_task = asyncio.Queue(maxsize=1)
@@ -347,6 +358,9 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
             self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, _async_startup)
 
     async def _trigger_check_weather(self, event=None):
+        _check = await check_all_entities(self)
+        if _check is False:
+            return
         check_weather(self)
         if self._last_call_for_heat != self.call_for_heat:
             self._last_call_for_heat = self.call_for_heat
@@ -356,6 +370,9 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
                 await self.control_queue_task.put(self)
 
     async def _trigger_time(self, event=None):
+        _check = await check_all_entities(self)
+        if _check is False:
+            return
         _LOGGER.debug("better_thermostat %s: get last avg outdoor temps...", self.name)
         await check_ambient_air_temperature(self)
         self.async_write_ha_state()
@@ -363,12 +380,18 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
             await self.control_queue_task.put(self)
 
     async def _trigger_temperature_change(self, event):
+        _check = await check_all_entities(self)
+        if _check is False:
+            return
         self.async_set_context(event.context)
         if (event.data.get("new_state")) is None:
             return
         self.hass.async_create_task(trigger_temperature_change(self, event))
 
     async def _trigger_humidity_change(self, event):
+        _check = await check_all_entities(self)
+        if _check is False:
+            return
         self.async_set_context(event.context)
         if (event.data.get("new_state")) is None:
             return
@@ -380,6 +403,9 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
         self.async_write_ha_state()
 
     async def _trigger_trv_change(self, event):
+        _check = await check_all_entities(self)
+        if _check is False:
+            return
         self.async_set_context(event.context)
         if self._async_unsub_state_changed is None:
             return
@@ -390,6 +416,9 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
         self.hass.async_create_task(trigger_trv_change(self, event))
 
     async def _trigger_window_change(self, event):
+        _check = await check_all_entities(self)
+        if _check is False:
+            return
         self.async_set_context(event.context)
         if (event.data.get("new_state")) is None:
             return
@@ -419,17 +448,29 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
                     )
                     await asyncio.sleep(10)
                     continue
-            for trv in self.real_trvs.keys():
-                trv_state = self.hass.states.get(trv)
-                if trv_state is not None or trv_state is None:
-                    if trv_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN, None):
+
+            try:
+                for trv in self.real_trvs.keys():
+                    trv_state = self.hass.states.get(trv)
+                    if trv_state is None:
                         _LOGGER.info(
                             "better_thermostat %s: waiting for TRV/climate entity with id '%s' to become fully available...",
                             self.name,
                             trv,
                         )
                         await asyncio.sleep(10)
-                        continue
+                        raise ContinueLoop
+                    if trv_state is not None:
+                        if trv_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN, None):
+                            _LOGGER.info(
+                                "better_thermostat %s: waiting for TRV/climate entity with id '%s' to become fully available...",
+                                self.name,
+                                trv,
+                            )
+                            await asyncio.sleep(10)
+                            raise ContinueLoop
+            except ContinueLoop:
+                continue
 
             if self.window_id is not None:
                 if self.hass.states.get(self.window_id).state in (
@@ -499,16 +540,20 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
                 states, ATTR_TARGET_TEMP_STEP, reduce=max
             )
 
+            self.all_entities.append(self.sensor_entity_id)
+
             self.cur_temp = convert_to_float(
                 str(sensor_state.state), self.name, "startup()"
             )
             if self.humidity_entity_id is not None:
+                self.all_entities.append(self.humidity_entity_id)
                 self.cur_humidity = convert_to_float(
                     str(self.hass.states.get(self.humidity_entity_id).state),
                     self.name,
                     "startup()",
                 )
             if self.window_id is not None:
+                self.all_entities.append(self.window_id)
                 window = self.hass.states.get(self.window_id)
 
                 check = window.state
@@ -662,6 +707,7 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
             self.async_write_ha_state()
 
             for trv in self.real_trvs.keys():
+                self.all_entities.append(trv)
                 await init(self, trv)
                 if self.real_trvs[trv]["calibration"] == 0:
                     self.real_trvs[trv]["last_calibration"] = await get_current_offset(
@@ -732,6 +778,7 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
             self.async_write_ha_state()
             #
             await asyncio.sleep(5)
+            await check_all_entities(self)
             # update_hvac_action(self)
             # Add listener
             if self.outdoor_sensor is not None:
@@ -856,6 +903,8 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
             ATTR_STATE_HUMIDIY: self.cur_humidity,
             ATTR_STATE_MAIN_MODE: self.last_main_hvac_mode,
             ATTR_STATE_HEATING_POWER: self.heating_power,
+            ATTR_STATE_ERRORS: json.dumps(self.devices_errors),
+            ATTR_STATE_BATTERIES: json.dumps(self.devices_states),
         }
 
         return dev_specific
