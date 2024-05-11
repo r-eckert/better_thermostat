@@ -62,7 +62,7 @@ async def init(self, entity_id):
 
     if (
         self.real_trvs[entity_id]["local_temperature_override_entity"] is None
-        and self.real_trvs[entity_id]["calibration"] == 2
+        and self.real_trvs[entity_id]["calibration"] == 3
     ):
         self.real_trvs[entity_id][
             "local_temperature_override_entity"

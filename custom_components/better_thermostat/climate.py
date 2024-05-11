@@ -333,7 +333,7 @@ class BetterThermostat(ClimateEntity, RestoreEntity, ABC):
             _calibration = 1
             if trv["advanced"]["calibration"] == CalibrationType.LOCAL_BASED:
                 _calibration = 0
-            elif trv["advanced"]["calibration"] == "hybrid_calibration":
+            elif trv["advanced"]["calibration"] == CalibrationType.HYBRID:
                 _calibration = 2
             elif trv["advanced"]["calibration"] == CalibrationType.TEMPERATURE_OVERRIDE_BASED:
                 _calibration = 3
